@@ -12,11 +12,13 @@
 double ctlOut[4] = {};
 int ctlHeight = 150;
 
-bool ctlOn = false;
+bool ctlOn = false, oeValid = false;
 
 void sendOut(const double * out)
 {
-	if (isnan(out[0]) || isnan(out[1]) || isnan(out[2]) || isnan(out[3])) return;
+	if (isnan(out[0]) || isnan(out[1]) || isnan(out[2]) || isnan(out[3])) {
+		oeValid = false;  return;
+	}
 	const int top = 50;
 	double o[4] = {
 		(1 - out[0]) * (top / 2),
@@ -98,7 +100,7 @@ struct Pos2D
 	}
 };
 
-Pos2D setpoint = { cv::Vec2d(320, 240), cv::Vec2d(0, -70) };
+Pos2D setpoint = { cv::Vec2d(320, 240), cv::Vec2d(0, -50) };
 
 bool getPos2D(cv::Point2d * green, cv::Point2d * orange, Pos2D &pos)
 {
@@ -139,18 +141,37 @@ void calcErrors(const Pos2D &sp, const Pos2D &p, double *errors)
 
 void calcOuts(const double *errors, double *outs)
 {
+	static double oldErrors[4] = {};
+	static double itg = 0;
+	const double Kp = 0.5, Kd = 10.0;
+	const double Kpt = 1.0, Kit = 0.1;
 	outs[0] = -errors[0];
+	outs[1] = -errors[1];
+	outs[2] = -errors[2] * Kp;
+	outs[3] = -errors[3] * Kp;
+	if (oeValid) {
+		outs[1] += itg * Kit;
+		itg -= errors[1];
+		if (itg >  0.5) itg =  0.5;
+		if (itg < -0.5) itg = -0.5;
+		outs[2] -= (errors[2] - oldErrors[2]) * Kd;
+		outs[3] -= (errors[3] - oldErrors[3]) * Kd;
+	}
+	else itg = 0;
+
 	if (outs[0] >  1) outs[0] =  1;
 	if (outs[0] < -1) outs[0] = -1;
-	outs[1] = -errors[1];
 	if (outs[1] >  1) outs[1] =  1;
 	if (outs[1] < -1) outs[1] = -1;
-	outs[2] = -errors[2] * 2;
 	if (outs[2] >  1) outs[2] =  1;
 	if (outs[2] < -1) outs[2] = -1;
-	outs[3] = -errors[3] * 2;
 	if (outs[3] >  1) outs[3] =  1;
 	if (outs[3] < -1) outs[3] = -1;
+	oldErrors[0] = errors[0];
+	oldErrors[1] = errors[1];
+	oldErrors[2] = errors[2];
+	oldErrors[3] = errors[3];
+	oeValid = true;
 }
 
 int main()
@@ -167,9 +188,9 @@ int main()
 	cv::namedWindow("Camera", CV_WINDOW_FULLSCREEN);
 	cv::setMouseCallback("Camera", cbf, NULL);
 	int hue = 10, sat = 80, val = 100;
-	cv::createTrackbar("H", "Camera", &hue, 255);
+	/*cv::createTrackbar("H", "Camera", &hue, 255);
 	cv::createTrackbar("S", "Camera", &sat, 255);
-	cv::createTrackbar("V", "Camera", &val, 255);
+	cv::createTrackbar("V", "Camera", &val, 255);*/
 
 	cv::namedWindow("Control", CV_WINDOW_FULLSCREEN);
 	cv::setMouseCallback("Control", CallBackFunc, NULL);
@@ -191,7 +212,6 @@ int main()
 		std::vector<std::vector<cv::Point> > ctGr, ctOr;
 		cv::findContours(grm, ctGr, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 		cv::findContours(orm, ctOr, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-		//for(int x = 0; x < contours.size(); x++)
 		cv::drawContours(bl, ctGr, -1, cv::Scalar(0, 255, 0, 255));
 		cv::drawContours(bl, ctOr, -1, cv::Scalar(0, 0, 255, 255));
 		cv::Point2d grp[2], orp[2];
@@ -210,7 +230,10 @@ int main()
 				calcOuts(errors, ctlOut);
 				if (ctlOn) sendOut(ctlOut);
 			}
+			else oeValid = false;
 		}
+		else oeValid = false;
+
 		cv::imshow("Camera", maskOn ? grm : bl);
 
 
@@ -228,13 +251,17 @@ int main()
 		case 'm': maskOn = !maskOn; break;
 		case 'c': if (!ctlOn) {
 				connect(_T("COM5"));
+				//sendData("+h;", 3);
 				ctlOn = true;
 			}
 			break;
 		case 'p':
 			sendData("+p;", 3);
 			break;
-		case 'd': 
+		case 'h':
+			sendData("+h;", 3);
+			break;
+		case 'd':
 			if (ctlOn) {
 				sendData("+p;", 3);
 
