@@ -12,37 +12,46 @@
 double ctlOut[4] = {};
 int ctlHeight = 150;
 
-void CallBackFunc(int event, int x, int y, int flags, void* userdata)
+bool ctlOn = false;
+
+void sendOut(const double * out)
 {
-	if (event == cv::EVENT_MOUSEMOVE && (flags & cv::EVENT_FLAG_LBUTTON))
+	if (isnan(out[0]) || isnan(out[1]) || isnan(out[2]) || isnan(out[3])) return;
+	const int top = 50;
+	double o[4] = {
+		(1 - out[0]) * (top / 2),
+		(1 + out[1]) * (top / 2),
+		(1 - out[2]) * (top / 2),
+		(1 + out[3]) * (top / 2)
+	};
+	if (o[0] < 0  ) o[0] = 0.0;
+	if (o[0] > top) o[0] = top;
+	if (o[1] < 0)   o[1] = 0.0;
+	if (o[1] > top) o[1] = top;
+	if (o[2] < 0)   o[2] = 0.0;
+	if (o[2] > top) o[2] = top;
+	if (o[3] < 0)   o[3] = 0.0;
+	if (o[3] > top) o[3] = top;
+	char buf[16];
+	sprintf_s(buf, "+a%02d%02d%02d%02d;", (int)round(o[0]), (int)round(o[1]), (int)round(o[2]), (int)round(o[3]));
+	sendData(buf, strlen(buf));
+}
+
+void CallBackFunc(int event, int x, int y, int flags, void * userdata)
+{
+	if (event == cv::EVENT_MOUSEMOVE && (flags & cv::EVENT_FLAG_LBUTTON) || event == cv::EVENT_LBUTTONDOWN)
 	{
 		if (x < ctlHeight)
 		{
 			ctlOut[0] = ((double)x / ctlHeight) * 2 - 1;
-			ctlOut[1] = ((double)y / ctlHeight) * 2 - 1;
-			/*if (out[0] > 31) out[0] = 31;
-			if (out[0] < -31) out[0] = -31;
-			if (out[1] > 31) out[1] = 31;
-			if (out[1] < -31) out[1] = -31;*/
+			ctlOut[1] = 1 - ((double)y / ctlHeight) * 2;
 		}
 		else
 		{
 			ctlOut[2] = ((double)x / ctlHeight) * 2 - 3;
-			ctlOut[3] = ((double)y / ctlHeight) * 2 - 1;
-			/*if (out[2] > 31) out[2] = 31;
-			if (out[2] < -31) out[2] = -31;
-			if (out[3] > 31) out[3] = 31;
-			if (out[3] < -31) out[3] = -31;*/
+			ctlOut[3] = 1 - ((double)y / ctlHeight) * 2;
 		}
-		/*unsigned char o[4] = {
-			(out[0] + 32) | 0,
-			(out[1] + 32) | 0x40,
-			(out[2] + 32) | 0x80,
-			(out[3] + 32) | 0xC0
-		};*/
-		//sendData(o, 4);
-		//printf();
-		//cout << "Left button of the mouse is clicked - position (" << x << ", " << y << ")" << endl;
+		if (ctlOn) sendOut(ctlOut);
 	}
 }
 
@@ -136,17 +145,17 @@ void calcOuts(const double *errors, double *outs)
 	outs[1] = -errors[1];
 	if (outs[1] >  1) outs[1] =  1;
 	if (outs[1] < -1) outs[1] = -1;
-	outs[2] = -errors[2];
+	outs[2] = -errors[2] * 2;
 	if (outs[2] >  1) outs[2] =  1;
 	if (outs[2] < -1) outs[2] = -1;
-	outs[3] = -errors[3];
+	outs[3] = -errors[3] * 2;
 	if (outs[3] >  1) outs[3] =  1;
 	if (outs[3] < -1) outs[3] = -1;
 }
 
 int main()
 {
-	bool ctlOn = false, maskOn = false;
+	bool maskOn = false;
 	int count = 0;
 	int img = -1;
 	cv::VideoCapture cap(0);
@@ -199,6 +208,7 @@ int main()
 				double errors[4] = {};
 				calcErrors(setpoint, pos, errors);
 				calcOuts(errors, ctlOut);
+				if (ctlOn) sendOut(ctlOut);
 			}
 		}
 		cv::imshow("Camera", maskOn ? grm : bl);
@@ -216,12 +226,19 @@ int main()
 			cv::imwrite("s" + std::to_string(count++) + ".png", cam);
 			break;
 		case 'm': maskOn = !maskOn; break;
-		case 'c': if (ctlOn) {
-
-				ctlOn = false;
-			} else {
-				connect();
+		case 'c': if (!ctlOn) {
+				connect(_T("COM5"));
 				ctlOn = true;
+			}
+			break;
+		case 'p':
+			sendData("+p;", 3);
+			break;
+		case 'd': 
+			if (ctlOn) {
+				sendData("+p;", 3);
+
+				//ctlOn = false;
 			}
 			break;
 		case 27: return 0;

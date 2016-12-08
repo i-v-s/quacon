@@ -1,5 +1,5 @@
 #pragma once
 #include <Windows.h>
 
-void connect();
-void sendData(const void * Data, DWORD Count);
+void connect(TCHAR * CurrentPort);
+void sendData(const void * Data, size_t Count);

@@ -41,14 +41,12 @@ DWORD WINAPI ReceiveThread(void * Param)
 	return 0;
 }
 
-void connect()
+void connect(TCHAR * CurrentPort)
 {
 	using namespace std;
 
 	InitializeCriticalSection(&FSSection);
 
-	//KillPortScan();
-	TCHAR * CurrentPort = _T("COM5");//PortListBox->Text;
 	cout << "Try to open port...";
 
 	HANDLE handle = CreateFile(CurrentPort, GENERIC_READ | GENERIC_WRITE, NULL, NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
@@ -69,7 +67,7 @@ void connect()
 		//CBUpdate->State = BST_UNCHECKED;
 		return;
 	}
-	dcb.BaudRate = 19200;// 56000;
+	dcb.BaudRate = 115200;// 56000;
 	dcb.ByteSize = 8;
 	dcb.Parity = 0;
 	dcb.StopBits = 0;
@@ -101,7 +99,7 @@ void connect()
 	//hReceive = CreateThread(0, 0, &ReceiveThread, 0, 0, &Id);
 }
 
-void sendData(const void * Data, DWORD Count)
+void sendData(const void * Data, size_t Count)
 {
 	using namespace std;
 	if (!hPort) return;
@@ -117,20 +115,20 @@ void sendData(const void * Data, DWORD Count)
 	DWORD W;
 
 	SetCommMask(hPort, EV_TXEMPTY);
-	DWORD MaxSize = 500;
-	DWORD c = 0;
+	size_t MaxSize = 500;
+	size_t c = 0;
 	for (const char * d = (const char *)Data; c < Count; d += MaxSize)
 	{
-		DWORD s = MaxSize;
+		size_t s = MaxSize;
 		if (s > Count - c) s = Count - c;
 		c += s;
 		EnterCriticalSection(&FSSection);
-		if (!WriteFile(hPort, d, s, &W, &Overlap))
+		if (!WriteFile(hPort, d, (DWORD)s, &W, &Overlap))
 		{
 			int e = GetLastError();
 			if (e != 997)
 			{
-				printf("Ошибка WriteFile(): %d, отправлено %d из %d.", e, W, Count);
+				printf("Ошибка WriteFile(): %d, отправлено %d из %d.", e, W, (int)Count);
 				LeaveCriticalSection(&FSSection);
 				return;
 			}
@@ -141,7 +139,7 @@ void sendData(const void * Data, DWORD Count)
 			DWORD e = GetLastError();
 			if (e == ERROR_OPERATION_ABORTED)
 			{
-				printf("Отправка прервана %d/%d", c, Count);
+				printf("Отправка прервана %d/%d", (int)c, (int)Count);
 				return;
 			}
 			if (e != ERROR_IO_INCOMPLETE)
