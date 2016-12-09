@@ -100,7 +100,7 @@ struct Pos2D
 	}
 };
 
-Pos2D setpoint = { cv::Vec2d(320, 240), cv::Vec2d(0, -50) };
+Pos2D setpoint = { cv::Vec2d(320, 240), cv::Vec2d(0, -40) };
 
 bool getPos2D(cv::Point2d * green, cv::Point2d * orange, Pos2D &pos)
 {
@@ -142,22 +142,35 @@ void calcErrors(const Pos2D &sp, const Pos2D &p, double *errors)
 void calcOuts(const double *errors, double *outs)
 {
 	static double oldErrors[4] = {};
-	static double itg = 0;
-	const double Kp = 0.5, Kd = 10.0;
-	const double Kpt = 1.0, Kit = 0.1;
+	static double itg[4] = {};
+	const double Kp = 0.05, Kd = 5.0, Ki = 0.01;
+	const double Kpt = 1.0, Kdt = 5, Kit = 0.0;// 3;
+	const double itgmax = 0.4, itgmin = -0.4;
 	outs[0] = -errors[0];
-	outs[1] = -errors[1];
+	outs[1] = -errors[1] * Kpt;
 	outs[2] = -errors[2] * Kp;
 	outs[3] = -errors[3] * Kp;
 	if (oeValid) {
-		outs[1] += itg * Kit;
-		itg -= errors[1];
-		if (itg >  0.5) itg =  0.5;
-		if (itg < -0.5) itg = -0.5;
-		outs[2] -= (errors[2] - oldErrors[2]) * Kd;
-		outs[3] -= (errors[3] - oldErrors[3]) * Kd;
+		outs[1] += itg[1] * Kit - (errors[1] - oldErrors[1]) * Kdt;
+		itg[1] -= errors[1];
+		itg[2] -= errors[2] * Ki;
+		itg[3] -= errors[3] * Ki;
+		if (itg[1] >  0.4) itg[1] =  0.4;
+		if (itg[1] < -0.4) itg[1] = -0.4;
+		if (itg[2] > itgmax) itg[2] = itgmax;
+		if (itg[2] < itgmin) itg[2] = itgmin;
+		if (itg[3] > itgmax) itg[3] = itgmax;
+		if (itg[3] < itgmin) itg[3] = itgmin;
+		outs[2] -= (errors[2] - oldErrors[2]) * Kd - itg[2];
+		outs[3] -= (errors[3] - oldErrors[3]) * Kd - itg[3];
 	}
-	else itg = 0;
+	else
+	{
+		itg[0] = 0;
+		itg[1] = 0;
+		itg[2] = 0;
+		itg[3] = 0;
+	}
 
 	if (outs[0] >  1) outs[0] =  1;
 	if (outs[0] < -1) outs[0] = -1;
