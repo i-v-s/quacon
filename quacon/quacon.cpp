@@ -190,9 +190,11 @@ void calcOuts(const double *errors, double *outs)
 int main()
 {
 	bool maskOn = false;
+	int viewMode = 4;
 	int count = 0;
 	int img = -1;
-	cv::VideoCapture cap(0);
+	bool wc2 = false;
+	cv::VideoCapture cap(0);// , cap1(1);
 	if (!cap.isOpened())  // check if we succeeded
 		return -1;
 
@@ -225,19 +227,26 @@ int main()
 		std::vector<std::vector<cv::Point> > ctGr, ctOr;
 		cv::findContours(grm, ctGr, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 		cv::findContours(orm, ctOr, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-		cv::drawContours(bl, ctGr, -1, cv::Scalar(0, 255, 0, 255));
-		cv::drawContours(bl, ctOr, -1, cv::Scalar(0, 0, 255, 255));
+		if (viewMode >= 2)
+		{
+			cv::drawContours(bl, ctGr, -1, cv::Scalar(0, 255, 0, 255));
+			cv::drawContours(bl, ctOr, -1, cv::Scalar(0, 0, 255, 255));
+		}
 		cv::Point2d grp[2], orp[2];
 		if (findTwoPoints(ctGr, grp) && findTwoPoints(ctOr, orp))
 		{
-			cv::circle(bl, grp[0], 5, cv::Scalar(0, 255, 0, 255), -1);
-			cv::circle(bl, grp[1], 5, cv::Scalar(0, 255, 0, 255), -1);
-			cv::circle(bl, orp[0], 5, cv::Scalar(0, 0, 255, 255), -1);
-			cv::circle(bl, orp[1], 5, cv::Scalar(0, 0, 255, 255), -1);
+			if (viewMode >= 3)
+			{
+				cv::circle(bl, grp[0], 5, cv::Scalar(0, 255, 0, 255), -1);
+				cv::circle(bl, grp[1], 5, cv::Scalar(0, 255, 0, 255), -1);
+				cv::circle(bl, orp[0], 5, cv::Scalar(0, 0, 255, 255), -1);
+				cv::circle(bl, orp[1], 5, cv::Scalar(0, 0, 255, 255), -1);
+			}
 			Pos2D pos;
 			if (getPos2D(grp, orp, pos))
 			{
-				pos.arrow(bl, cv::Scalar(255, 255, 255, 255));
+				if (viewMode >= 4)
+					pos.arrow(bl, cv::Scalar(255, 255, 255, 255));
 				double errors[4] = {};
 				calcErrors(setpoint, pos, errors);
 				calcOuts(errors, ctlOut);
@@ -247,8 +256,13 @@ int main()
 		}
 		else oeValid = false;
 
-		cv::imshow("Camera", maskOn ? grm : bl);
+		cv::imshow("Camera", (viewMode == 1) ? hsv : bl);
 
+		/*if (wc2) {
+			cv::Mat wc2m;
+			cap1 >> wc2m;
+			cv::imshow("Camera 2", wc2m);
+		}*/
 
 		cv::rectangle(ctl, rect, cv::Scalar::all(255), CV_FILLED);
 		cv::circle(ctl, cv::Point2d((1 + ctlOut[0]) * ctlHeight / 2, (1 - ctlOut[1]) * ctlHeight / 2), 20, cv::Scalar::all(0), -1);
@@ -268,6 +282,8 @@ int main()
 				ctlOn = true;
 			}
 			break;
+		case '-': if (viewMode > 0) viewMode--; break;
+		case '+': if (viewMode < 4) viewMode++; break;
 		case 'p':
 			sendData("+p;", 3);
 			break;
@@ -281,6 +297,10 @@ int main()
 				//ctlOn = false;
 			}
 			break;
+		/*case 'q':
+			wc2 = true;
+
+			break;*/
 		case 27: return 0;
 		case '0': img = -1; break;
 		default: if (k >= '0' && k <= '9') {
