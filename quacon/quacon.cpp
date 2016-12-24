@@ -1,4 +1,4 @@
-// quacon.cpp: определяет точку входа для консольного приложения.
+// quacon.cpp: РѕРїСЂРµРґРµР»СЏРµС‚ С‚РѕС‡РєСѓ РІС…РѕРґР° РґР»СЏ РєРѕРЅСЃРѕР»СЊРЅРѕРіРѕ РїСЂРёР»РѕР¶РµРЅРёСЏ.
 //
 
 #include "stdafx.h"
@@ -7,7 +7,13 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/calib3d.hpp>
 #include <vector>
-#include "serial.h"
+#include <QtSerialPort/QSerialPort>
+
+QSerialPort serial;
+
+void connect()
+{
+}
 
 double ctlOut[4] = {};
 int ctlHeight = 150;
@@ -36,7 +42,7 @@ void sendOut(const double * out)
 	if (o[3] > top) o[3] = top;
 	char buf[16];
 	sprintf_s(buf, "+a%02d%02d%02d%02d;", (int)round(o[0]), (int)round(o[1]), (int)round(o[2]), (int)round(o[3]));
-	sendData(buf, strlen(buf));
+    serial.write(buf);
 }
 
 void CallBackFunc(int event, int x, int y, int flags, void * userdata)
@@ -277,22 +283,25 @@ int main()
 			break;
 		case 'm': maskOn = !maskOn; break;
 		case 'c': if (!ctlOn) {
-				connect(_T("COM5"));
-				//sendData("+h;", 3);
-				ctlOn = true;
+                serial.setPortName("COM5");
+                serial.setBaudRate(QSerialPort::Baud115200);
+                if (serial.open(QIODevice::ReadWrite)) {
+                    //sendData("+h;", 3);
+                    ctlOn = true;
+                }
 			}
 			break;
 		case '-': if (viewMode > 0) viewMode--; break;
 		case '+': if (viewMode < 4) viewMode++; break;
 		case 'p':
-			sendData("+p;", 3);
+            serial.write("+p;");
 			break;
 		case 'h':
-			sendData("+h;", 3);
+            serial.write("+h;");
 			break;
 		case 'd':
 			if (ctlOn) {
-				sendData("+p;", 3);
+                //sendData("+p;", 3);
 
 				//ctlOn = false;
 			}
